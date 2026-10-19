@@ -7,18 +7,20 @@
 <link rel="icon" href="/icon.png">
 <link rel="stylesheet" href="/app.css">
 <style>
-  body { min-height: 100vh; display: grid; place-items: center; padding: 24px; }
-  .box { max-width: 380px; text-align: center; }
+  body { min-height: 100vh; display: grid; grid-template-rows: 1fr auto; padding: 24px 24px calc(20px + env(safe-area-inset-bottom)); }
+  .box { max-width: 380px; text-align: center; align-self: center; justify-self: center; }
   .box img { width: 72px; height: 72px; border-radius: 18px; }
   .box h1 { font-size: 24px; margin: 18px 0 8px; }
   .box p { color: var(--ink-2); margin: 0; }
+  footer { text-align: center; }
 </style>
 </head>
 <body>
   <div class="box">
     <img src="/icon.png" alt="">
-    <h1>Kodu yeniden okutun</h1>
-    <p>Bu bağlantının süresi dolmuş ya da eksik. Bilgisayardaki Köprü penceresinde görünen QR kodu iPhone kamerasıyla okutun.</p>
+    <h1>{{TITLE}}</h1>
+    <p>{{TEXT}}</p>
   </div>
+  <footer><span class="sig">Köprü {{VERSION}}<b>MSY</b></span></footer>
 </body>
 </html>

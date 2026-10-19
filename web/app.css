@@ -117,3 +117,10 @@ a { color: var(--river); }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* İmza */
+.sig { display: inline-flex; align-items: baseline; gap: 10px; color: var(--ink-3); font-size: 12.5px; white-space: nowrap; }
+.sig b {
+  font: 800 15px/1 var(--font-head); letter-spacing: .06em; color: var(--river);
+  padding-left: 10px; border-left: 1px solid var(--line);
+}

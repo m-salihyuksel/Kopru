@@ -17,6 +17,7 @@
   .brand h1 { font-size: 22px; font-weight: 700; }
   .top .bridge { max-width: 620px; width: 100%; justify-self: center; }
   .bridge svg { max-width: 420px; height: auto; justify-self: center; }
+  .tools { display: flex; align-items: center; gap: 14px; justify-self: end; }
   .status { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--ink-2); white-space: nowrap; }
   .status .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--ink-3); flex: none; }
   .status.on { color: var(--ink); font-weight: 600; }
@@ -35,6 +36,8 @@
   .connect h2 { font-size: 20px; font-weight: 700; margin-bottom: 16px; }
   .qr { background: #fff; border-radius: 16px; padding: 18px; aspect-ratio: 1; display: grid; place-items: center; }
   .qr img { width: 100%; height: 100%; image-rendering: pixelated; display: block; }
+  .qr { transition: outline-color .6s; outline: 4px solid transparent; outline-offset: 4px; }
+  .qr.renewed { outline-color: var(--amber); }
   .qr .ph { color: #576573; font-size: 14px; text-align: center; }
   .steps { margin: 18px 0 0; padding: 0; list-style: none; counter-reset: s; display: grid; gap: 10px; }
   .steps li { counter-increment: s; display: grid; grid-template-columns: 26px 1fr; gap: 10px; font-size: 14px; line-height: 1.4; }
@@ -125,6 +128,7 @@
 
   footer.paths { max-width: 1400px; margin: 0 auto; padding: 0 28px 28px; color: var(--ink-3); font-size: 12.5px; display: flex; gap: 20px; flex-wrap: wrap; }
   footer.paths span { overflow-wrap: anywhere; }
+  footer.paths .sig { margin-left: auto; }
 
   @media (max-width: 960px) {
     .grid { max-height: none; }
@@ -162,7 +166,11 @@
     </svg>
     <div class="bank right">{{HOST}}<small>bu bilgisayar</small></div>
   </div>
-  <div class="status" id="status" role="status"><span class="dot"></span><span id="statusText">iPhone bekleniyor</span></div>
+  <div class="tools">
+    <div class="status" id="status" role="status"><span class="dot"></span><span id="statusText">iPhone bekleniyor</span></div>
+    <button class="btn danger" type="button" id="kick" hidden>
+      <svg viewBox="0 0 24 24" class="ico"><path d="M12 3v8"/><path d="M6.4 6.6a8 8 0 1 0 11.2 0"/></svg>Bağlantıyı kes</button>
+  </div>
 </header>
 
 <main class="layout">
@@ -220,7 +228,7 @@
 <footer class="paths">
   <span id="pathIn"></span>
   <span id="pathOut"></span>
-  <span>Köprü {{VERSION}}</span>
+  <span class="sig">Köprü {{VERSION}}<b>MSY</b></span>
 </footer>
 
 <div class="offline" id="offline" hidden><div><h2>Köprü kapalı</h2><p>Uygulama penceresi kapatılmış görünüyor. Köprü'yü yeniden başlatınca bu sayfa kendiliğinden yenilenir.</p></div></div>
@@ -258,6 +266,7 @@
   const speed = new Map(); // id -> {t, done, rate}
   let offline = false;
   let lastState = null;
+  let lastNotice = null;
 
   async function poll() {
     try {
@@ -305,12 +314,18 @@
       $('#phoneSub').textContent = c.ip;
     } else if (c) {
       st.classList.remove('on');
-      const m = Math.max(1, Math.round(c.ago / 60));
-      $('#statusText').textContent = c.device + ', ' + (c.ago < 60 ? 'az önce' : m + ' dk önce') + ' görüldü';
+      const ago = c.ago < 60 ? 'az önce' : c.ago < 3600 ? Math.round(c.ago / 60) + ' dk önce' : Math.round(c.ago / 3600) + ' saat önce';
+      $('#statusText').textContent = c.device + ', ' + ago + ' görüldü';
       $('#phoneSub').textContent = 'bağlantı bekleniyor';
     } else {
       st.classList.remove('on'); $('#statusText').textContent = 'iPhone bekleniyor'; $('#phoneSub').textContent = 'bekleniyor';
     }
+    $('#kick').hidden = !c;
+
+    // iPhone tarafındaki olaylar (ör. telefon bağlantıyı kesti)
+    const nid = s.notice ? s.notice.id : 0;
+    if (lastNotice !== null && nid > lastNotice && s.notice.text) toast(s.notice.text);
+    lastNotice = nid;
 
     // canlı aktarımlar
     const ups = s.uploads || [];
@@ -404,6 +419,30 @@
       const r = await post('/api/delete?dir=out&name=' + enc(n));
       if (r.ok) { toast('Kaldırıldı'); lastOutKey = null; } else toast('Kaldırılamadı');
     }
+  });
+
+  // ---------- bağlantıyı kes ----------
+  $('#kick').addEventListener('click', async () => {
+    const s = lastState || {};
+    const active = (s.uploads || []).some((u) => u.dest === 'in') || s.sending > 0;
+    const msg = (active ? 'iPhone ile süren aktarım durdurulacak. ' : '') +
+      'iPhone\'un bağlantısı kesilsin mi? QR kod yenilenir; yeniden bağlanmak için yeni kodu okutmak gerekir.';
+    if (!confirm(msg)) return;
+    let d;
+    try {
+      const r = await post('/api/disconnect-all');
+      if (!r.ok) throw new Error();
+      d = await r.json();
+    } catch (e) { toast('Bağlantı kesilemedi'); return; }
+    history.replaceState(null, '', '/pc?t=' + enc(d.token));
+    lastQR = '';
+    try {
+      const st = await (await fetch('/api/state', { cache: 'no-store' })).json();
+      lastState = st; render(st);
+    } catch (e) {}
+    const q = document.querySelector('.qr');
+    q.classList.add('renewed'); setTimeout(() => q.classList.remove('renewed'), 1600);
+    toast('Bağlantı kesildi. Yeni QR kod hazır.');
   });
 
   // ---------- PC'den gönderilecekler'e ekleme ----------

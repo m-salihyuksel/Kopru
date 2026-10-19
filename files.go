@@ -199,11 +199,15 @@ func cleanupParts(dir string) {
 
 // counter, yükleme ilerlemesini sayan bir io.Writer sarmalayıcısıdır.
 type counter struct {
-	w interface{ Write([]byte) (int, error) }
-	n atomic.Int64
+	w    interface{ Write([]byte) (int, error) }
+	n    atomic.Int64
+	stop func() bool // PC'den bağlantı kesilince true döner
 }
 
 func (c *counter) Write(p []byte) (int, error) {
+	if c.stop != nil && c.stop() {
+		return 0, errStopped
+	}
 	n, err := c.w.Write(p)
 	c.n.Add(int64(n))
 	return n, err

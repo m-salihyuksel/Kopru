@@ -22,6 +22,7 @@ ZIP'i bir klasöre çıkarın ve `Kopru.exe`'ye çift tıklayın. Tüm sürümle
 2. iPhone'da Kamera'yı açıp QR koda tutun, çıkan bağlantıya dokunun. Safari'de Köprü sayfası açılır.
 3. **iPhone → PC:** "PC'ye gönder" ile fotoğraf, video ya da dosya seçin. Gelenler `Köprü\iPhone'dan Gelenler` klasörüne kaydedilir.
 4. **PC → iPhone:** Dosyaları paneldeki "iPhone'a gönderilecekler" alanına sürükleyin. iPhone'da "PC'den al" sekmesinde görünür; tek tek ya da toplu ZIP olarak indirilebilir.
+5. **Bağlantıyı kes:** iPhone'da sağ üstteki düğme yalnızca o telefonun oturumunu kapatır; QR kodu okutunca yeniden bağlanır. PC panelindeki düğme bağlı iPhone'u hemen düşürür, süren aktarımı durdurur ve yeni bir QR kod oluşturur; eski kod artık çalışmaz.
 
 iPhone ile bilgisayar aynı Wi-Fi ağında olmalı (bilgisayar iPhone'un Kişisel Erişim Noktası'na bağlıyken de çalışır). Dosyalar internete çıkmaz, yalnızca yerel ağda aktarılır. Ayrıntılı kılavuz ve sorun çözme: [docs/Nasıl kullanılır.txt](docs/Nasıl%20kullanılır.txt)
 
@@ -39,6 +40,7 @@ iPhone ile bilgisayar aynı Wi-Fi ağında olmalı (bilgisayar iPhone'un Kişise
 Go 1.22+ gerekir.
 
 ```
+go test ./...
 go build -ldflags "-s -w" -o Kopru.exe .
 ```
 
@@ -61,8 +63,14 @@ rsrc -ico winres/icon.ico -manifest winres/kopru.manifest -arch amd64 -o rsrc_wi
 |---|---|
 | `main.go` | Başlangıç, ayarlar, ikinci kopya kontrolü, konsol çıktısı |
 | `server.go` | HTTP uçları, erişim kontrolü, yükleme/indirme/ZIP |
+| `session.go` | Bağlantıyı kesme, anahtar yenileme, süren aktarımları durdurma |
 | `files.go` | Dosya adı temizleme, listeleme, benzersiz ad ayırma |
 | `thumb.go` | Önizleme üretimi ve EXIF döndürme |
 | `netinfo.go` | iPhone'un ulaşabileceği yerel IP'nin seçimi |
 | `platform_windows.go` | Konsol ayarları, tarayıcı/Gezgin açma |
 | `web/` | PC paneli, iPhone sayfası, ortak stil, ikon |
+| `kopru_test.go` | Telefondan gelen istekleri taklit eden testler |
+
+---
+
+Geliştiren: **MSY**

@@ -1,3 +1,10 @@
+## 1.1.0 ile gelenler
+
+- **Bağlantıyı kes** düğmesi iPhone'da ve PC'de. iPhone'dan kesince yalnızca o telefonun oturumu kapanır. PC'den kesince bağlı iPhone hemen düşer, süren aktarım durur ve yeni QR kod oluşur.
+- Sayfaların altına **MSY** imzası eklendi.
+
+---
+
 iPhone ile Windows PC arasında Wi-Fi üzerinden fotoğraf, video ve dosya aktarımı.
 
 **Kurulum:** `Kopru-Windows.zip` dosyasını indirin, bir klasöre çıkarın ve `Kopru.exe`'ye çift tıklayın. Ayrıntılar ZIP içindeki "Nasıl kullanılır.txt" dosyasında.

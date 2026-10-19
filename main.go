@@ -15,24 +15,28 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"unicode/utf8"
 )
 
 const (
 	appName     = "Köprü"
 	appID       = "kopru"
-	appVersion  = "1.0.0"
+	appVersion  = "1.1.0"
 	defaultPort = 8765
 	inFolder    = "iPhone'dan Gelenler"
 	outFolder   = "iPhone'a Gönderilecekler"
 )
 
 type Config struct {
-	Token string `json:"token"`
-	Dir   string `json:"dir,omitempty"`
+	Token   string   `json:"token"`
+	Dir     string   `json:"dir,omitempty"`
+	Revoked []string `json:"revoked,omitempty"` // PC'den kesilmiş eski anahtarlar
 }
 
 type App struct {
-	token    string
+	token    string // a.mu ile korunur; curToken() ile okuyun
+	cfg      Config
+	cfgPath  string
 	port     int
 	baseDir  string
 	inDir    string
@@ -45,6 +49,10 @@ type App struct {
 	nextID   int64
 	clients  map[string]*Client
 	failures map[string]*failure
+	revoked  map[string]bool
+
+	noticeID   int64
+	noticeText string
 
 	localMu      sync.Mutex
 	localIPs     map[string]bool
@@ -53,6 +61,7 @@ type App struct {
 	thumbs  *thumbCache
 	logCh   chan string
 	sending atomic.Int32 // telefona o an giden indirme sayısı
+	gen     atomic.Int64 // her "Bağlantıyı kes"te artar; süren aktarımlar buna bakıp durur
 }
 
 type Upload struct {
@@ -106,22 +115,7 @@ func main() {
 	}
 	base, _ = filepath.Abs(base)
 
-	app := &App{
-		token:    cfg.Token,
-		baseDir:  base,
-		inDir:    filepath.Join(base, inFolder),
-		outDir:   filepath.Join(base, outFolder),
-		reserved: map[string]bool{},
-		uploads:  map[int64]*Upload{},
-		clients:  map[string]*Client{},
-		failures: map[string]*failure{},
-		thumbs:   newThumbCache(64 << 20),
-		logCh:    make(chan string, 512),
-	}
-	app.hostname, _ = os.Hostname()
-	if app.hostname == "" {
-		app.hostname = "Bu PC"
-	}
+	app := newApp(cfg, cfgPath, base)
 
 	for _, d := range []string{app.inDir, app.outDir} {
 		if err := os.MkdirAll(d, 0o755); err != nil {
@@ -161,13 +155,39 @@ func main() {
 	if !*noBrowser {
 		go func() {
 			time.Sleep(400 * time.Millisecond)
-			openBrowser(fmt.Sprintf("http://127.0.0.1:%d/pc?t=%s", app.port, app.token))
+			openBrowser(fmt.Sprintf("http://127.0.0.1:%d/pc?t=%s", app.port, app.curToken()))
 		}()
 	}
 
 	if err := srv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		fatal("Sunucu durdu: %v", err)
 	}
+}
+
+func newApp(cfg Config, cfgPath, base string) *App {
+	app := &App{
+		token:    cfg.Token,
+		cfg:      cfg,
+		cfgPath:  cfgPath,
+		revoked:  map[string]bool{},
+		baseDir:  base,
+		inDir:    filepath.Join(base, inFolder),
+		outDir:   filepath.Join(base, outFolder),
+		reserved: map[string]bool{},
+		uploads:  map[int64]*Upload{},
+		clients:  map[string]*Client{},
+		failures: map[string]*failure{},
+		thumbs:   newThumbCache(64 << 20),
+		logCh:    make(chan string, 512),
+	}
+	for _, t := range cfg.Revoked {
+		app.revoked[t] = true
+	}
+	app.hostname, _ = os.Hostname()
+	if app.hostname == "" {
+		app.hostname = "Bu PC"
+	}
+	return app
 }
 
 func listenFrom(port int, exact bool) (net.Listener, error) {
@@ -199,13 +219,16 @@ func isRunning(port int) bool {
 
 func (a *App) printBanner() {
 	line := strings.Repeat("─", 58)
+	title := fmt.Sprintf("  %s %s  –  iPhone ↔ PC aktarım", appName, appVersion)
+	pad := max(2, utf8.RuneCountInString(line)-utf8.RuneCountInString(title)-len("MSY")-2)
 	fmt.Println(line)
-	fmt.Printf("  %s %s  –  iPhone ↔ PC aktarım\n", appName, appVersion)
+	fmt.Println(title + strings.Repeat(" ", pad) + "MSY")
 	fmt.Println(line)
 	fmt.Println()
 	fmt.Println("  Panel tarayıcıda açıldı. Açılmadıysa şu adrese gidin:")
-	fmt.Printf("    http://127.0.0.1:%d/pc?t=%s\n\n", a.port, a.token)
-	addrs := lanAddrs(a.port, a.token)
+	tok := a.curToken()
+	fmt.Printf("    http://127.0.0.1:%d/pc?t=%s\n\n", a.port, tok)
+	addrs := lanAddrs(a.port, tok)
 	if len(addrs) == 0 {
 		fmt.Println("  ! Ağ bağlantısı bulunamadı. PC ile iPhone aynı Wi-Fi'da olmalı.")
 	} else {

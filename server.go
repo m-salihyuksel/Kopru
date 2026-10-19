@@ -5,6 +5,7 @@ import (
 	"crypto/subtle"
 	"embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html"
 	"io"
@@ -42,6 +43,7 @@ func (a *App) routes() http.Handler {
 	mux.HandleFunc("GET /favicon.ico", a.static("web/icon.png", "image/png"))
 	mux.HandleFunc("GET /app.css", a.static("web/app.css", "text/css; charset=utf-8"))
 
+	mux.HandleFunc("GET /bye", func(w http.ResponseWriter, r *http.Request) { a.infoPage(w, "bye", http.StatusOK) })
 	mux.HandleFunc("GET /{$}", a.auth(a.page("web/phone.html")))
 	mux.HandleFunc("GET /pc", a.auth(a.localOnly(a.page("web/pc.html"))))
 
@@ -50,6 +52,8 @@ func (a *App) routes() http.Handler {
 	mux.HandleFunc("POST /api/upload", a.auth(a.handleUpload))
 	mux.HandleFunc("POST /api/delete", a.auth(a.localOnly(a.handleDelete)))
 	mux.HandleFunc("POST /api/reveal", a.auth(a.localOnly(a.handleReveal)))
+	mux.HandleFunc("POST /api/disconnect", a.auth(a.handleDisconnect))
+	mux.HandleFunc("POST /api/disconnect-all", a.auth(a.localOnly(a.handleDisconnectAll)))
 	mux.HandleFunc("GET /qr.png", a.auth(a.localOnly(a.handleQR)))
 
 	mux.HandleFunc("GET /f/{dir}/{name}", a.auth(a.handleFile))
@@ -77,21 +81,29 @@ func (a *App) auth(h http.HandlerFunc) http.HandlerFunc {
 			http.Error(w, "Çok fazla hatalı deneme. 10 dakika sonra tekrar deneyin.", http.StatusTooManyRequests)
 			return
 		}
+		tok := a.curToken()
+		match := func(s string) bool { return s != "" && subtle.ConstantTimeCompare([]byte(s), []byte(tok)) == 1 }
+		qt := r.URL.Query().Get("t")
+		ct := ""
+		if c, err := r.Cookie("kopru"); err == nil {
+			ct = c.Value
+		}
 		ok := false
-		if t := r.URL.Query().Get("t"); t != "" {
-			ok = subtle.ConstantTimeCompare([]byte(t), []byte(a.token)) == 1
-			if ok {
-				http.SetCookie(w, &http.Cookie{
-					Name: "kopru", Value: a.token, Path: "/",
-					MaxAge: 365 * 24 * 3600, HttpOnly: true, SameSite: http.SameSiteLaxMode,
-				})
-			}
-		} else if c, err := r.Cookie("kopru"); err == nil {
-			ok = subtle.ConstantTimeCompare([]byte(c.Value), []byte(a.token)) == 1
+		switch {
+		case match(qt):
+			ok = true
+			setAuthCookie(w, tok)
+		case match(ct):
+			ok = true // adresteki anahtar eski olsa bile geçerli çerez yeterli
 		}
 		if !ok {
+			if a.isRevoked(qt) || a.isRevoked(ct) {
+				clearAuthCookie(w)
+				a.denied(w, r, "revoked")
+				return
+			}
 			a.fail(ip)
-			a.denied(w, r)
+			a.denied(w, r, "invalid")
 			return
 		}
 		if r.Method == http.MethodPost && r.Header.Get("X-Kopru") != "1" {
@@ -149,16 +161,22 @@ func (a *App) touchClient(ip, ua string) {
 	c.LastSeen = time.Now()
 }
 
-func (a *App) denied(w http.ResponseWriter, r *http.Request) {
+func (a *App) denied(w http.ResponseWriter, r *http.Request, kind string) {
 	if strings.HasPrefix(r.URL.Path, "/api/") || r.Method != http.MethodGet {
-		http.Error(w, "Yetkisiz. PC ekranındaki QR kodu yeniden okutun.", http.StatusUnauthorized)
+		msg := "Yetkisiz. PC ekranındaki QR kodu yeniden okutun."
+		if kind == "revoked" {
+			msg = "Bağlantı bilgisayardan kesildi."
+		}
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.Header().Set("Cache-Control", "no-store")
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]string{"error": msg, "code": kind})
 		return
 	}
-	b, _ := webFS.ReadFile("web/denied.html")
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Header().Set("Cache-Control", "no-store")
-	w.WriteHeader(http.StatusUnauthorized)
-	w.Write(b)
+	if a.isLocal(r) {
+		kind = "local"
+	}
+	a.infoPage(w, kind, http.StatusUnauthorized)
 }
 
 func (a *App) static(name, ctype string) http.HandlerFunc {
@@ -218,10 +236,10 @@ func (a *App) handleState(w http.ResponseWriter, r *http.Request) {
 	}
 	cls := []clientOut{}
 	for _, c := range a.clients {
-		if time.Since(c.LastSeen) < 10*time.Minute {
-			cls = append(cls, clientOut{c.IP, c.Device, since(c.LastSeen)})
-		}
+		cls = append(cls, clientOut{c.IP, c.Device, since(c.LastSeen)})
 	}
+	notice := map[string]any{"id": a.noticeID, "text": a.noticeText}
+	tok := a.token
 	a.mu.Unlock()
 	sort.Slice(ups, func(i, j int) bool { return ups[i].ID < ups[j].ID })
 	sort.Slice(cls, func(i, j int) bool { return cls[i].Ago < cls[j].Ago })
@@ -229,7 +247,7 @@ func (a *App) handleState(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]any{
 		"host":    a.hostname,
 		"port":    a.port,
-		"addrs":   lanAddrs(a.port, a.token),
+		"addrs":   lanAddrs(a.port, tok),
 		"in":      listDir(a.inDir),
 		"out":     listDir(a.outDir),
 		"inDir":   a.inDir,
@@ -237,6 +255,7 @@ func (a *App) handleState(w http.ResponseWriter, r *http.Request) {
 		"uploads": ups,
 		"clients": cls,
 		"sending": a.sending.Load(),
+		"notice":  notice,
 	})
 }
 
@@ -281,7 +300,7 @@ func (a *App) handleUpload(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, http.StatusInternalServerError, "Dosya oluşturulamadı: "+err.Error())
 		return
 	}
-	cnt := &counter{w: f}
+	cnt := &counter{w: f, stop: a.stopFunc(r)}
 	who := "PC"
 	if !a.isLocal(r) {
 		who = deviceFromUA(r.UserAgent())
@@ -305,6 +324,15 @@ func (a *App) handleUpload(w http.ResponseWriter, r *http.Request) {
 	}
 	if err == nil && r.ContentLength >= 0 && n != r.ContentLength {
 		err = io.ErrUnexpectedEOF
+	}
+	if errors.Is(err, errStopped) {
+		os.Remove(part)
+		a.logf("× Durduruldu: %s", up.Name)
+		w.Header().Set("Connection", "close")
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.WriteHeader(http.StatusGone)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Bağlantı bilgisayardan kesildi.", "code": "revoked"})
+		return
 	}
 	if err != nil {
 		os.Remove(part)
@@ -450,7 +478,11 @@ func (a *App) handleFile(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Disposition", contentDisposition("inline", name))
 	}
 	w.Header().Set("Cache-Control", "private, max-age=0")
-	http.ServeContent(w, r, name, st.ModTime(), f)
+	var rs io.ReadSeeker = f
+	if stop := a.stopFunc(r); stop != nil {
+		rs = &stopReader{f, stop}
+	}
+	http.ServeContent(w, r, name, st.ModTime(), rs)
 }
 
 func (a *App) handleThumb(w http.ResponseWriter, r *http.Request) {
@@ -519,6 +551,7 @@ func (a *App) handleZip(w http.ResponseWriter, r *http.Request) {
 		a.sending.Add(1)
 		defer a.sending.Add(-1)
 	}
+	stop := a.stopFunc(r)
 	zw := zip.NewWriter(w)
 	buf := make([]byte, 1<<20)
 	for _, f := range sel {
@@ -530,7 +563,11 @@ func (a *App) handleZip(w http.ResponseWriter, r *http.Request) {
 		hdr := &zip.FileHeader{Name: f.Name, Method: zip.Store, Modified: time.UnixMilli(f.MTime)}
 		dst, err := zw.CreateHeader(hdr)
 		if err == nil {
-			_, err = io.CopyBuffer(dst, src, buf)
+			var rd io.Reader = src
+			if stop != nil {
+				rd = &stopReader{src, stop}
+			}
+			_, err = io.CopyBuffer(dst, rd, buf)
 		}
 		src.Close()
 		if err != nil {

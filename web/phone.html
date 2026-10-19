@@ -17,7 +17,10 @@
   body { font-size: 16px; padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
   .wrap { max-width: 560px; margin: 0 auto; padding: calc(14px + env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 0 max(16px, env(safe-area-inset-left)); }
 
+  .ph-title { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
   .ph-top h1 { font-size: 28px; font-weight: 700; }
+  .ph-title .btn { padding: 7px 12px; font-size: 14px; margin-right: -6px; }
+  .ph-foot { text-align: center; margin: 36px 0 4px; }
   .ph-top .bridge { margin-top: 10px; }
   .ph-top .bridge svg { height: auto; }
 
@@ -107,7 +110,11 @@
 <body>
 <div class="wrap">
   <header class="ph-top">
-    <h1>Köprü</h1>
+    <div class="ph-title">
+      <h1>Köprü</h1>
+      <button class="btn quiet danger" type="button" id="leave">
+        <svg viewBox="0 0 24 24" class="ico"><path d="M12 3v8"/><path d="M6.4 6.6a8 8 0 1 0 11.2 0"/></svg>Bağlantıyı kes</button>
+    </div>
     <div class="bridge" id="bridge">
       <div class="bank">iPhone<small>bu telefon</small></div>
       <svg viewBox="0 0 300 44" aria-hidden="true">
@@ -137,7 +144,7 @@
       <label class="picker" for="file">
         <span class="disc"><svg viewBox="0 0 24 24" class="ico"><path d="M12 19V5M5 12l7-7 7 7"/></svg></span>
         <strong>Fotoğraf, video ya da dosya seç</strong>
-        <span>Seçtiklerin hemen {{HOST}} bilgisayarına gider.</span>
+        <span>Seçtikleriniz hemen {{HOST}} bilgisayarına gider.</span>
       </label>
       <input type="file" id="file" multiple class="sr">
 
@@ -164,6 +171,8 @@
       <div class="empty" id="getEmpty"><strong>Henüz bir şey yok</strong>Bilgisayardaki Köprü penceresine dosya sürükleyin. Eklenenler birkaç saniye içinde burada görünür.</div>
     </section>
   </main>
+
+  <footer class="ph-foot"><span class="sig">Köprü {{VERSION}}<b>MSY</b></span></footer>
 </div>
 
 <div class="sheet" id="sheet" hidden>
@@ -234,6 +243,20 @@
 
   // ---------- PC'ye gönder ----------
   const queue = []; let qid = 0; let busy = false;
+  let currentXhr = null, leaving = false;
+
+  // Bağlantı PC'den kesildiyse sayfayı yenile: sunucu "Bağlantı bilgisayardan kesildi" sayfasını gösterir.
+  function goRevoked() {
+    if (leaving) return;
+    leaving = true;
+    location.reload();
+  }
+  async function stillAllowed() {
+    try {
+      const r = await fetch('/api/files?dir=out', { cache: 'no-store' });
+      return r.status !== 401;
+    } catch (e) { return true; } // ağ hatası; bağlantı kesilmiş sayılmaz
+  }
   let batch = { bytes: 0, t0: 0, rate: 0, lastT: 0, lastB: 0 };
 
   $('#file').addEventListener('change', (e) => {
@@ -252,8 +275,12 @@
     if (busy) return; busy = true;
     batch = { t0: performance.now(), rate: 0, lastT: performance.now(), lastB: sentBytes() };
     let item;
-    while ((item = queue.find((q) => q.state === 'wait'))) await send(item);
+    while (!leaving && (item = queue.find((q) => q.state === 'wait'))) {
+      await send(item);
+      if (item.state === 'err' && !(await stillAllowed())) { goRevoked(); return; }
+    }
     busy = false; setFlow(); draw();
+    if (leaving) return;
     const ok = queue.filter((q) => q.state === 'ok').length;
     const bad = queue.filter((q) => q.state === 'err').length;
     if (ok || bad) toast(bad ? `${bad} dosya gönderilemedi` : `${ok} dosya PC'ye ulaştı`);
@@ -265,6 +292,7 @@
     return new Promise((resolve) => {
       item.state = 'run'; item.done = 0; item.err = ''; setFlow(); draw();
       const x = new XMLHttpRequest();
+      currentXhr = x;
       x.open('POST', `/api/upload?name=${enc(item.file.name)}&mtime=${item.file.lastModified || ''}`);
       x.setRequestHeader('X-Kopru', '1');
       x.upload.onprogress = (e) => { item.done = e.loaded; tick(); draw(); };
@@ -275,11 +303,11 @@
         } else {
           item.state = 'err';
           try { item.err = JSON.parse(x.responseText).error; } catch (e) { item.err = 'PC dosyayı kabul etmedi (' + x.status + ').'; }
-          if (x.status === 401) item.err = 'Oturum süresi doldu. PC ekranındaki kodu yeniden okutun.';
+          if (x.status === 401 || x.status === 410) { item.err = 'Bağlantı bilgisayardan kesildi.'; goRevoked(); }
         }
-        draw(); resolve();
+        currentXhr = null; draw(); resolve();
       };
-      x.onerror = () => { item.state = 'err'; item.err = 'Bağlantı koptu. Aynı Wi-Fi\'da olduğunuzdan emin olun.'; draw(); resolve(); };
+      x.onerror = () => { item.state = 'err'; item.err = 'Bağlantı koptu. Aynı Wi-Fi\'da olduğunuzdan emin olun.'; currentXhr = null; draw(); resolve(); };
       x.send(item.file);
     });
   }
@@ -344,7 +372,7 @@
   $('#clearDone').onclick = () => { for (let i = queue.length - 1; i >= 0; i--) if (queue[i].state !== 'err') queue.splice(i, 1); draw(); };
 
   window.addEventListener('beforeunload', (e) => {
-    if (busy) { e.preventDefault(); e.returnValue = ''; }
+    if (busy && !leaving) { e.preventDefault(); e.returnValue = ''; }
   });
 
   // ---------- PC'den al ----------
@@ -353,7 +381,7 @@
   async function refresh() {
     try {
       const r = await fetch('/api/files?dir=out', { cache: 'no-store' });
-      if (r.status === 401) { location.reload(); return; }
+      if (r.status === 401) { goRevoked(); return; }
       const d = await r.json();
       failCount = 0; $('#offbar').hidden = true;
       files = d.files || [];
@@ -429,8 +457,21 @@
     setTimeout(() => { downloading = Math.max(0, downloading - 1); setFlow(); }, 4000);
   });
 
+  // ---------- bağlantıyı kes ----------
+  $('#leave').addEventListener('click', async () => {
+    const msg = busy
+      ? 'Gönderim sürüyor. Bağlantıyı keserseniz yarım kalan dosyalar kaydedilmez. Yine de kesilsin mi?'
+      : 'Bu iPhone\'un bilgisayarla bağlantısı kesilsin mi? Yeniden bağlanmak için QR kodu tekrar okutmanız gerekir.';
+    if (!confirm(msg)) return;
+    leaving = true;
+    if (currentXhr) currentXhr.abort();
+    try { await fetch('/api/disconnect', { method: 'POST', headers: { 'X-Kopru': '1' } }); } catch (e) {}
+    location.replace('/bye');
+  });
+
   // ---------- bağlantı takibi ----------
   async function loop() {
+    if (leaving) return;
     if (!document.hidden) await refresh();
     setTimeout(loop, $('#get').hidden ? 6000 : 3000);
   }

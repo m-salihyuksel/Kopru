@@ -32,7 +32,8 @@ iPHONE'U BAĞLAMA
   dokunun. Safari'de Köprü sayfası açılır.
 - İpucu: Safari'de paylaş simgesi → "Ana Ekrana Ekle" derseniz Köprü
   iPhone'da uygulama gibi bir simgeyle durur; bir dahaki sefere QR
-  okutmadan açabilirsiniz (bilgisayarın IP adresi değişmediyse).
+  okutmadan açabilirsiniz (bilgisayarın IP adresi değişmediyse ve PC'den
+  bağlantı kesilmediyse).
 
 
 iPHONE → PC
@@ -62,6 +63,18 @@ PC → iPHONE
   dokununca açılır.
 
 
+BAĞLANTIYI KESME
+----------------
+- iPhone'da: Köprü sayfasının sağ üstündeki "Bağlantıyı kes"e dokunun.
+  Bu iPhone'un oturumu kapanır. Yeniden bağlanmak için QR kodu tekrar
+  okutmanız yeterli; kod değişmez.
+- PC'de: Panelin sağ üstündeki "Bağlantıyı kes"e basın (bir iPhone
+  bağlandığında görünür). Bağlı iPhone hemen düşer, süren aktarım durur
+  ve QR kod yenilenir. Eski kodla ya da ana ekrana eklenmiş eski
+  bağlantıyla artık girilemez; yeniden bağlanmak için yeni kodu okutun.
+  Ana ekrana eklediğiniz Köprü simgesini silip yeni koddan tekrar ekleyin.
+
+
 SORUN ÇÖZME
 -----------
 * iPhone sayfayı açamıyor ("Sunucuya bağlanılamıyor"):
@@ -78,7 +91,8 @@ SORUN ÇÖZME
 
 * "Kodu yeniden okutun" sayfası çıkıyor:
   Paneldeki QR kodu tekrar okutun. Erişim anahtarı bu bilgisayara özel
-  ve kalıcıdır; başkası aynı ağda olsa bile anahtar olmadan giremez.
+  ve kalıcıdır; yalnızca PC'den "Bağlantıyı kes" deyince değişir.
+  Başkası aynı ağda olsa bile anahtar olmadan giremez.
 
 * Aktarım yavaş: Bilgisayara ya da iPhone'a yakın durun; 5 GHz Wi-Fi
   çok daha hızlıdır.
@@ -89,3 +103,6 @@ GELİŞMİŞ
 Kopru.exe -dir "D:\Aktarımlar"   Farklı bir ana klasör kullanır.
 Kopru.exe -port 9000             Farklı port kullanır.
 Ayarlar: %AppData%\Kopru\config.json
+
+
+Köprü – MSY
