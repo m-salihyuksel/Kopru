@@ -48,7 +48,7 @@ Linux/macOS'tan Windows için:
 GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o Kopru.exe .
 ```
 
-Yeni bir `v*` etiketi gönderildiğinde GitHub Actions `.exe`'yi derleyip sürüm sayfasına `Kopru-Windows.zip` olarak ekler.
+`main` dalına her gönderimde GitHub Actions `.exe`'yi derleyip `main.go` içindeki `appVersion` numarasıyla sürüm sayfasına `Kopru-Windows.zip` olarak ekler. Yeni sürüm için `appVersion`'ı artırmak yeterli.
 
 İkon `rsrc_windows_amd64.syso` dosyasından gelir. Yeniden üretmek için:
 

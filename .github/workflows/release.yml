@@ -1,12 +1,22 @@
 name: Sürüm oluştur
 
+# main dalına gönderilen her değişiklikte Windows .exe derlenir ve
+# main.go içindeki appVersion numarasıyla (ör. v1.0.0) sürüm sayfasına eklenir.
+# Yeni bir sürüm yayınlamak için appVersion'ı artırmak yeterli.
 on:
   push:
-    tags: ["v*"]
+    branches: [main]
+    paths-ignore:
+      - "README.md"
+      - "docs/ekran-*.png"
   workflow_dispatch:
 
 permissions:
   contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
   windows:
@@ -17,6 +27,10 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: "1.24"
+
+      - name: Sürüm numarasını oku
+        id: ver
+        run: echo "tag=v$(grep -oP 'appVersion\s*=\s*"\K[^"]+' main.go)" >> "$GITHUB_OUTPUT"
 
       - name: Windows için derle
         run: GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o Kopru.exe .
@@ -34,7 +48,10 @@ jobs:
       - name: Sürümü yayınla
         uses: softprops/action-gh-release@v2
         with:
-          name: Köprü ${{ github.ref_name }}
+          tag_name: ${{ steps.ver.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: Köprü ${{ steps.ver.outputs.tag }}
           body_path: .github/release-notes.md
           files: Kopru-Windows.zip
+          overwrite_files: true
           make_latest: true
