@@ -1,0 +1,493 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Köprü</title>
+<link rel="icon" href="/icon.png">
+<link rel="stylesheet" href="/app.css">
+<style>
+  body { min-height: 100vh; }
+  .top {
+    display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 28px;
+    padding: 18px 28px; border-bottom: 1px solid var(--line); background: var(--surface);
+  }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand img { width: 34px; height: 34px; border-radius: 9px; }
+  .brand h1 { font-size: 22px; font-weight: 700; }
+  .top .bridge { max-width: 620px; width: 100%; justify-self: center; }
+  .bridge svg { max-width: 420px; height: auto; justify-self: center; }
+  .status { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--ink-2); white-space: nowrap; }
+  .status .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--ink-3); flex: none; }
+  .status.on { color: var(--ink); font-weight: 600; }
+  .status.on .dot { background: var(--ok); box-shadow: 0 0 0 4px color-mix(in srgb, var(--ok) 20%, transparent); }
+
+  .layout {
+    display: grid; grid-template-columns: 330px minmax(0, 1fr); gap: 24px;
+    padding: 24px 28px 40px; max-width: 1400px; margin: 0 auto;
+    grid-template-areas: "connect in" "connect out";
+    align-items: start;
+  }
+  .connect {
+    grid-area: connect; position: sticky; top: 24px;
+    background: var(--panel); color: var(--panel-ink); border-radius: 22px; padding: 24px;
+  }
+  .connect h2 { font-size: 20px; font-weight: 700; margin-bottom: 16px; }
+  .qr { background: #fff; border-radius: 16px; padding: 18px; aspect-ratio: 1; display: grid; place-items: center; }
+  .qr img { width: 100%; height: 100%; image-rendering: pixelated; display: block; }
+  .qr .ph { color: #576573; font-size: 14px; text-align: center; }
+  .steps { margin: 18px 0 0; padding: 0; list-style: none; counter-reset: s; display: grid; gap: 10px; }
+  .steps li { counter-increment: s; display: grid; grid-template-columns: 26px 1fr; gap: 10px; font-size: 14px; line-height: 1.4; }
+  .steps li::before {
+    content: counter(s); width: 26px; height: 26px; border-radius: 50%;
+    background: color-mix(in srgb, var(--panel-ink) 18%, transparent); display: grid; place-items: center;
+    font: 700 13px var(--font-head);
+  }
+  .manual { margin-top: 20px; padding-top: 18px; border-top: 1px solid color-mix(in srgb, var(--panel-ink) 22%, transparent); font-size: 13px; }
+  .manual p { margin: 0 0 8px; opacity: .85; }
+  .urlrow { display: flex; gap: 6px; align-items: stretch; }
+  .urlrow code {
+    flex: 1; min-width: 0; font: 600 13px/1.3 ui-monospace, "Cascadia Mono", Consolas, monospace; word-break: break-all;
+    background: color-mix(in srgb, #000 18%, transparent); padding: 9px 10px; border-radius: 10px; user-select: all;
+  }
+  .urlrow button {
+    border: 0; border-radius: 10px; padding: 0 12px; cursor: pointer; font-weight: 600; font-size: 13px;
+    background: color-mix(in srgb, var(--panel-ink) 16%, transparent); color: inherit;
+  }
+  .urlrow button:hover { background: color-mix(in srgb, var(--panel-ink) 26%, transparent); }
+  .addr { margin-top: 12px; display: grid; gap: 6px; }
+  .addr select {
+    width: 100%; border-radius: 10px; border: 0; padding: 8px 10px; font-size: 13px;
+    background: color-mix(in srgb, #000 18%, transparent); color: inherit;
+  }
+  .addr select option { color: #16212B; }
+  .connect .hint { margin: 16px 0 0; font-size: 13px; line-height: 1.45; opacity: .85; }
+
+  .lane { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 20px 22px 22px; min-width: 0; }
+  #laneIn { grid-area: in; }
+  #laneOut { grid-area: out; }
+  .lane > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+  .lane h2 { font-size: 19px; font-weight: 700; }
+  .lane .meta { margin: 2px 0 0; color: var(--ink-2); font-size: 13px; }
+  .lane .actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+
+  .live { display: grid; gap: 10px; margin-bottom: 16px; }
+  .live:empty { display: none; }
+  .liverow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; padding: 12px 14px; border-radius: var(--r-md); background: var(--amber-tint); }
+  .liverow .n { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .liverow .p { font-size: 13px; color: var(--ink-2); text-align: right; }
+  .liverow .bar { grid-column: 1 / -1; background: color-mix(in srgb, var(--amber) 22%, transparent); }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 12px; max-height: min(46vh, 520px); overflow-y: auto; padding: 4px; margin: -4px; scrollbar-gutter: stable; }
+  .tile { border: 0; padding: 0; background: none; text-align: left; cursor: pointer; min-width: 0; border-radius: var(--r-md); }
+  .tile .pic {
+    aspect-ratio: 1; border-radius: var(--r-md); background: var(--sunk); overflow: hidden; display: grid; place-items: center;
+    color: var(--ink-3); position: relative; border: 1px solid var(--line);
+  }
+  .tile .pic img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .tile .pic .ext { position: absolute; bottom: 8px; left: 8px; font: 700 11px var(--font-ui); color: var(--ink-2); background: var(--surface); padding: 2px 6px; border-radius: 6px; }
+  .tile .pic .ico { width: 34px; height: 34px; }
+  .tile .cap { margin-top: 6px; font-size: 12.5px; line-height: 1.3; }
+  .tile .cap b { display: block; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tile .cap span { color: var(--ink-3); }
+  .tile:hover .pic { border-color: var(--river); }
+  .tile.fresh .pic { outline: 3px solid var(--amber); outline-offset: 2px; }
+  .more { margin: 14px 0 0; font-size: 13px; color: var(--ink-2); }
+
+  .empty { border: 1px dashed var(--line); border-radius: var(--r-md); padding: 28px 20px; text-align: center; color: var(--ink-2); font-size: 14px; }
+  .empty strong { display: block; color: var(--ink); font-family: var(--font-head); font-size: 16px; margin-bottom: 4px; }
+
+  .drop {
+    display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 14px;
+    border: 2px dashed var(--line); border-radius: var(--r-md); padding: 18px 20px; cursor: pointer;
+    background: var(--sunk); transition: border-color .15s, background .15s;
+  }
+  .drop .ico { width: 30px; height: 30px; color: var(--river); }
+  .drop strong { display: block; font-family: var(--font-head); font-size: 16px; }
+  .drop span { color: var(--ink-2); font-size: 13px; }
+  body.dragging .drop { border-color: var(--river); background: var(--river-tint); }
+
+  .rows { list-style: none; margin: 14px 0 0; padding: 0; }
+  .rows li { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto auto; align-items: center; gap: 12px; padding: 8px 4px; border-bottom: 1px solid var(--line); }
+  .rows li:last-child { border-bottom: 0; }
+  .rows .th { width: 44px; height: 44px; border-radius: 8px; background: var(--sunk); overflow: hidden; display: grid; place-items: center; color: var(--ink-3); }
+  .rows .th img { width: 100%; height: 100%; object-fit: cover; }
+  .rows .nm { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rows .sz { color: var(--ink-2); font-size: 13px; }
+
+  .offline {
+    position: fixed; inset: 0; background: color-mix(in srgb, var(--paper) 88%, transparent); backdrop-filter: blur(3px);
+    display: grid; place-items: center; z-index: 40; padding: 24px;
+  }
+  .offline div { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 24px 28px; max-width: 420px; text-align: center; }
+  .offline h2 { font-size: 20px; margin-bottom: 6px; }
+  .offline p { margin: 0; color: var(--ink-2); }
+
+  footer.paths { max-width: 1400px; margin: 0 auto; padding: 0 28px 28px; color: var(--ink-3); font-size: 12.5px; display: flex; gap: 20px; flex-wrap: wrap; }
+  footer.paths span { overflow-wrap: anywhere; }
+
+  @media (max-width: 960px) {
+    .grid { max-height: none; }
+    .top { grid-template-columns: 1fr auto; padding: 14px 18px; }
+    .top .bridge { grid-column: 1 / -1; grid-row: 2; }
+    .layout { grid-template-columns: 1fr; grid-template-areas: "connect" "in" "out"; padding: 16px; }
+    .connect { position: static; display: grid; grid-template-columns: 220px 1fr; gap: 0 24px; }
+    .connect h2 { grid-column: 1 / -1; }
+    .connect .qr { grid-row: span 3; }
+  }
+  @media (max-width: 600px) {
+    .connect { grid-template-columns: 1fr; }
+    .rows li { grid-template-columns: 44px minmax(0, 1fr) auto; }
+    .rows .sz { display: none; }
+  }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand"><img src="/icon.png" alt=""><h1>Köprü</h1></div>
+  <div class="bridge" id="bridge">
+    <div class="bank">iPhone<small id="phoneSub">bekleniyor</small></div>
+    <svg viewBox="0 0 300 44" aria-hidden="true">
+      <line class="deck" x1="4" y1="40" x2="296" y2="40"/>
+      <line class="hanger" x1="83" y1="19" x2="83" y2="40"/>
+      <line class="hanger" x1="150" y1="12" x2="150" y2="40"/>
+      <line class="hanger" x1="217" y1="19" x2="217" y2="40"/>
+      <path class="arch" d="M16 40 Q150 -16 284 40"/>
+      <circle class="traveler fwd" r="5.5" style="fill:var(--amber);stroke:var(--surface);stroke-width:2">
+        <animateMotion dur="1.3s" repeatCount="indefinite" path="M16 40 Q150 -16 284 40"/>
+      </circle>
+      <circle class="traveler rev" r="5.5" style="fill:var(--amber);stroke:var(--surface);stroke-width:2">
+        <animateMotion dur="1.3s" repeatCount="indefinite" path="M16 40 Q150 -16 284 40" keyPoints="1;0" keyTimes="0;1" calcMode="linear"/>
+      </circle>
+    </svg>
+    <div class="bank right">{{HOST}}<small>bu bilgisayar</small></div>
+  </div>
+  <div class="status" id="status" role="status"><span class="dot"></span><span id="statusText">iPhone bekleniyor</span></div>
+</header>
+
+<main class="layout">
+  <aside class="connect" aria-labelledby="connectTitle">
+    <h2 id="connectTitle">iPhone'u bağla</h2>
+    <div class="qr"><img id="qr" alt="iPhone ile okutulacak bağlantı kodu" hidden><span class="ph" id="qrPh">Ağ bağlantısı aranıyor…</span></div>
+    <ol class="steps">
+      <li>iPhone'da Kamera uygulamasını açın.</li>
+      <li>Kamerayı bu koda tutun ve çıkan bağlantıya dokunun.</li>
+      <li>Safari'de açılan Köprü sayfasından fotoğraf gönderin ya da PC'den dosya alın.</li>
+    </ol>
+    <div class="manual">
+      <p>Kod açılmazsa iPhone'da Safari'ye bu adresi yazın:</p>
+      <div class="urlrow"><code id="url">–</code><button type="button" id="copy">Kopyala</button></div>
+      <label class="addr" id="addrWrap" hidden>
+        <span>Kullanılan ağ bağlantısı</span>
+        <select id="addr"></select>
+      </label>
+    </div>
+    <p class="hint">iPhone ile bu bilgisayar aynı Wi-Fi ağında olmalı. Bilgisayar iPhone'un kişisel erişim noktasına bağlıyken de çalışır.</p>
+  </aside>
+
+  <section class="lane" id="laneIn" aria-labelledby="inTitle">
+    <header>
+      <div><h2 id="inTitle">iPhone'dan gelenler</h2><p class="meta num" id="inMeta">Henüz dosya yok</p></div>
+      <div class="actions"><button class="btn" data-reveal="in" type="button">
+        <svg viewBox="0 0 24 24" class="ico"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Klasörü aç</button></div>
+    </header>
+    <div class="live" id="liveIn"></div>
+    <div class="grid" id="inGrid"></div>
+    <div class="empty" id="inEmpty"><strong>iPhone'dan bir şey gönderin</strong>Köprü sayfasında "PC'ye gönder"e dokunup fotoğraf, video ya da dosya seçin. Gelenler burada ve klasörde görünür.</div>
+    <p class="more" id="inMore" hidden></p>
+  </section>
+
+  <section class="lane" id="laneOut" aria-labelledby="outTitle">
+    <header>
+      <div><h2 id="outTitle">iPhone'a gönderilecekler</h2><p class="meta num" id="outMeta">Liste boş</p></div>
+      <div class="actions">
+        <button class="btn primary" id="pick" type="button">
+          <svg viewBox="0 0 24 24" class="ico"><path d="M12 5v14M5 12h14"/></svg>Dosya ekle</button>
+        <button class="btn" data-reveal="out" type="button">
+          <svg viewBox="0 0 24 24" class="ico"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Klasörü aç</button>
+      </div>
+    </header>
+    <label class="drop" id="drop" for="pickInput">
+      <svg viewBox="0 0 24 24" class="ico"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+      <div><strong>Dosyaları buraya sürükleyin</strong><span>Klasör de bırakabilirsiniz. Eklenenler iPhone'daki Köprü sayfasında "PC'den al" bölümünde görünür.</span></div>
+    </label>
+    <input type="file" id="pickInput" multiple class="sr" tabindex="-1">
+    <div class="live" id="liveOut" style="margin-top:14px"></div>
+    <ul class="rows" id="outList"></ul>
+  </section>
+</main>
+
+<footer class="paths">
+  <span id="pathIn"></span>
+  <span id="pathOut"></span>
+  <span>Köprü {{VERSION}}</span>
+</footer>
+
+<div class="offline" id="offline" hidden><div><h2>Köprü kapalı</h2><p>Uygulama penceresi kapatılmış görünüyor. Köprü'yü yeniden başlatınca bu sayfa kendiliğinden yenilenir.</p></div></div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+  const $ = (s) => document.querySelector(s);
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const enc = encodeURIComponent;
+  const nf1 = new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 1 });
+  const size = (n) => {
+    if (n < 1024) return n + ' B';
+    const u = ['KB', 'MB', 'GB', 'TB']; let i = -1;
+    do { n /= 1024; i++; } while (n >= 1024 && i < u.length - 1);
+    return nf1.format(n) + ' ' + u[i];
+  };
+  const ICON = {
+    image: '<svg viewBox="0 0 24 24" class="ico"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/></svg>',
+    video: '<svg viewBox="0 0 24 24" class="ico"><rect x="3" y="5" width="14" height="14" rx="2"/><path d="m17 10 4-3v10l-4-3"/></svg>',
+    file: '<svg viewBox="0 0 24 24" class="ico"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>',
+    x: '<svg viewBox="0 0 24 24" class="ico"><path d="M6 6l12 12M18 6 6 18"/></svg>',
+  };
+  const extOf = (n) => { const i = n.lastIndexOf('.'); return i > 0 ? n.slice(i + 1).toUpperCase().slice(0, 5) : ''; };
+
+  let toastT;
+  const toast = (msg) => { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2600); };
+  const post = (url) => fetch(url, { method: 'POST', headers: { 'X-Kopru': '1' } });
+
+  // ---------- durum ----------
+  let chosenIP = null;
+  try { chosenIP = localStorage.getItem('kopru.ip'); } catch (e) {}
+  let lastQR = '', lastInKey = null, lastOutKey = null, knownIn = null;
+  const freshUntil = new Map();
+  const speed = new Map(); // id -> {t, done, rate}
+  let offline = false;
+  let lastState = null;
+
+  async function poll() {
+    try {
+      const r = await fetch('/api/state', { cache: 'no-store' });
+      if (r.status === 401) { location.reload(); return; }
+      const s = await r.json();
+      if (offline) { offline = false; $('#offline').hidden = true; }
+      lastState = s;
+      render(s);
+    } catch (e) {
+      if (!offline) { offline = true; $('#offline').hidden = false; }
+    }
+    setTimeout(poll, offline ? 3000 : 1200);
+  }
+
+  function render(s) {
+    // bağlantı adresi ve QR
+    const addrs = s.addrs || [];
+    let a = addrs.find((x) => x.ip === chosenIP) || addrs[0];
+    if (a) {
+      if (a.url !== lastQR) {
+        lastQR = a.url;
+        const img = $('#qr'); img.src = '/qr.png?u=' + enc(a.url); img.hidden = false; $('#qrPh').hidden = true;
+        $('#url').textContent = a.url.replace('http://', '');
+      }
+    } else {
+      $('#qr').hidden = true; $('#qrPh').hidden = false;
+      $('#qrPh').textContent = 'Ağ bağlantısı bulunamadı. Bilgisayarı Wi-Fi\'a bağlayın.';
+      $('#url').textContent = '–'; lastQR = '';
+    }
+    const sel = $('#addr');
+    $('#addrWrap').hidden = addrs.length < 2;
+    const optsKey = addrs.map((x) => x.ip + x.iface).join('|');
+    if (sel.dataset.k !== optsKey) {
+      sel.dataset.k = optsKey;
+      sel.innerHTML = addrs.map((x) => `<option value="${esc(x.ip)}">${esc(x.ip)} (${esc(x.iface)})</option>`).join('');
+    }
+    if (a) sel.value = a.ip;
+
+    // iPhone durumu
+    const c = (s.clients || [])[0];
+    const st = $('#status');
+    if (c && c.ago < 15) {
+      st.classList.add('on'); $('#statusText').textContent = c.device + ' bağlı';
+      $('#phoneSub').textContent = c.ip;
+    } else if (c) {
+      st.classList.remove('on');
+      const m = Math.max(1, Math.round(c.ago / 60));
+      $('#statusText').textContent = c.device + ', ' + (c.ago < 60 ? 'az önce' : m + ' dk önce') + ' görüldü';
+      $('#phoneSub').textContent = 'bağlantı bekleniyor';
+    } else {
+      st.classList.remove('on'); $('#statusText').textContent = 'iPhone bekleniyor'; $('#phoneSub').textContent = 'bekleniyor';
+    }
+
+    // canlı aktarımlar
+    const ups = s.uploads || [];
+    const inUps = ups.filter((u) => u.dest === 'in');
+    const flow = inUps.length ? 'to-pc' : (s.sending > 0 ? 'to-phone' : '');
+    const br = $('#bridge'); if (flow) br.dataset.flow = flow; else delete br.dataset.flow;
+    $('#liveIn').innerHTML = inUps.map(liveRow).join('');
+    for (const id of [...speed.keys()]) if (!ups.some((u) => u.id === id)) speed.delete(id);
+
+    // gelenler
+    const inFiles = s.in || [];
+    const inKey = inFiles.map((f) => f.name + f.mtime + f.size).join('|');
+    if (knownIn === null) knownIn = new Set(inFiles.map((f) => f.name));
+    else for (const f of inFiles) if (!knownIn.has(f.name)) { knownIn.add(f.name); freshUntil.set(f.name, Date.now() + 90000); }
+    const now = Date.now();
+    const freshKey = [...freshUntil].filter(([, t]) => t > now).map(([n]) => n).join('|');
+    if (inKey + freshKey !== lastInKey) {
+      lastInKey = inKey + freshKey;
+      const total = inFiles.reduce((x, f) => x + f.size, 0);
+      $('#inMeta').textContent = inFiles.length ? `${inFiles.length} dosya, toplam ${size(total)}` : 'Henüz dosya yok';
+      $('#inEmpty').hidden = inFiles.length > 0;
+      const shown = inFiles.slice(0, 240);
+      $('#inGrid').innerHTML = shown.map((f) => tile(f, (freshUntil.get(f.name) || 0) > now)).join('');
+      const more = $('#inMore'); more.hidden = inFiles.length <= shown.length;
+      more.textContent = `ve ${inFiles.length - shown.length} dosya daha. Tamamı için klasörü açın.`;
+    }
+
+    // gönderilecekler
+    const outFiles = s.out || [];
+    const outKey = outFiles.map((f) => f.name + f.mtime + f.size).join('|');
+    if (outKey !== lastOutKey) {
+      lastOutKey = outKey;
+      const total = outFiles.reduce((x, f) => x + f.size, 0);
+      $('#outMeta').textContent = outFiles.length ? `${outFiles.length} dosya, toplam ${size(total)}. iPhone bunları görebilir.` : 'Liste boş';
+      $('#outList').innerHTML = outFiles.map(row).join('');
+    }
+
+    $('#pathIn').textContent = 'Gelenler: ' + s.inDir;
+    $('#pathOut').textContent = 'Gönderilecekler: ' + s.outDir;
+  }
+
+  function liveRow(u) {
+    const now = performance.now();
+    let sp = speed.get(u.id);
+    if (!sp) { sp = { t: now, done: u.done, rate: 0 }; speed.set(u.id, sp); }
+    else if (now - sp.t > 800) {
+      const r = (u.done - sp.done) / ((now - sp.t) / 1000);
+      sp.rate = sp.rate ? sp.rate * 0.6 + r * 0.4 : r; sp.t = now; sp.done = u.done;
+    }
+    const pct = u.total > 0 ? Math.min(100, (u.done / u.total) * 100) : 0;
+    const rate = sp.rate > 0 ? `, ${size(sp.rate)}/sn` : '';
+    return `<div class="liverow"><span class="n">${esc(u.name)}</span>
+      <span class="p num">${u.total > 0 ? Math.floor(pct) + '%' : size(u.done)}${rate}</span>
+      <div class="bar"><i style="width:${pct}%"></i></div></div>`;
+  }
+
+  function tile(f, fresh) {
+    const v = '?v=' + f.mtime;
+    const pic = f.thumb
+      ? `<img src="/t/in/${enc(f.name)}${v}" alt="" loading="lazy" decoding="async">`
+      : `${ICON[f.kind]}<span class="ext">${esc(extOf(f.name))}</span>`;
+    return `<button class="tile${fresh ? ' fresh' : ''}" type="button" data-show="${esc(f.name)}" title="Klasörde göster">
+      <div class="pic">${pic}</div>
+      <div class="cap"><b>${esc(f.name)}</b><span class="num">${size(f.size)}</span></div></button>`;
+  }
+
+  function row(f) {
+    const th = f.thumb ? `<img src="/t/out/${enc(f.name)}?v=${f.mtime}" alt="" loading="lazy">` : ICON[f.kind];
+    return `<li><div class="th">${th}</div><span class="nm" title="${esc(f.name)}">${esc(f.name)}</span>
+      <span class="sz num">${size(f.size)}</span>
+      <button class="btn quiet danger" type="button" data-del="${esc(f.name)}">Kaldır</button></li>`;
+  }
+
+  // ---------- etkileşimler ----------
+  $('#addr').addEventListener('change', (e) => {
+    chosenIP = e.target.value; try { localStorage.setItem('kopru.ip', chosenIP); } catch (err) {}
+    if (lastState) render(lastState);
+  });
+  $('#copy').addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(lastQR); toast('Adres kopyalandı'); } catch (e) { toast('Kopyalanamadı; adresi elle seçin'); }
+  });
+  document.addEventListener('click', async (e) => {
+    const rv = e.target.closest('[data-reveal]');
+    if (rv) { post('/api/reveal?dir=' + rv.dataset.reveal); return; }
+    const sh = e.target.closest('[data-show]');
+    if (sh) { post('/api/reveal?dir=in&name=' + enc(sh.dataset.show)); return; }
+    const del = e.target.closest('[data-del]');
+    if (del) {
+      const n = del.dataset.del;
+      if (!confirm(`"${n}" gönderilecekler klasöründen silinsin mi?`)) return;
+      const r = await post('/api/delete?dir=out&name=' + enc(n));
+      if (r.ok) { toast('Kaldırıldı'); lastOutKey = null; } else toast('Kaldırılamadı');
+    }
+  });
+
+  // ---------- PC'den gönderilecekler'e ekleme ----------
+  const queue = []; let busy = false; let qid = 0;
+  $('#pick').addEventListener('click', () => $('#pickInput').click());
+  $('#pickInput').addEventListener('change', (e) => { addFiles([...e.target.files]); e.target.value = ''; });
+
+  let dragDepth = 0;
+  window.addEventListener('dragenter', (e) => { if (hasFiles(e)) { dragDepth++; document.body.classList.add('dragging'); } });
+  window.addEventListener('dragleave', () => { dragDepth = Math.max(0, dragDepth - 1); if (!dragDepth) document.body.classList.remove('dragging'); });
+  window.addEventListener('dragover', (e) => { if (hasFiles(e)) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; } });
+  window.addEventListener('drop', async (e) => {
+    if (!hasFiles(e)) return;
+    e.preventDefault(); dragDepth = 0; document.body.classList.remove('dragging');
+    const files = await filesFromDrop(e.dataTransfer);
+    if (files.length) addFiles(files);
+  });
+  const hasFiles = (e) => e.dataTransfer && [...e.dataTransfer.types].includes('Files');
+
+  async function filesFromDrop(dt) {
+    const entries = [...dt.items].map((it) => it.webkitGetAsEntry && it.webkitGetAsEntry()).filter(Boolean);
+    if (!entries.length) return [...dt.files];
+    const out = [];
+    const walk = async (en) => {
+      if (en.isFile) { out.push(await new Promise((res, rej) => en.file(res, rej)).catch(() => null)); return; }
+      if (en.isDirectory) {
+        const rd = en.createReader();
+        for (;;) {
+          const batch = await new Promise((res) => rd.readEntries(res, () => res([])));
+          if (!batch.length) break;
+          for (const b of batch) await walk(b);
+        }
+      }
+    };
+    for (const en of entries) await walk(en);
+    return out.filter(Boolean);
+  }
+
+  function addFiles(files) {
+    for (const f of files) queue.push({ id: ++qid, file: f, done: 0, state: 'wait' });
+    drawQueue(); pump();
+  }
+
+  async function pump() {
+    if (busy) return; busy = true;
+    let item;
+    while ((item = queue.find((q) => q.state === 'wait'))) await send(item);
+    busy = false;
+    const failed = queue.filter((q) => q.state === 'err').length;
+    const ok = queue.filter((q) => q.state === 'ok').length;
+    if (ok) toast(failed ? `${ok} dosya eklendi, ${failed} dosya eklenemedi` : `${ok} dosya eklendi`);
+    queue.length = 0; drawQueue(); lastOutKey = null;
+  }
+
+  function send(item) {
+    return new Promise((resolve) => {
+      item.state = 'run'; drawQueue();
+      const x = new XMLHttpRequest();
+      x.open('POST', `/api/upload?dest=out&name=${enc(item.file.name)}&mtime=${item.file.lastModified || ''}`);
+      x.setRequestHeader('X-Kopru', '1');
+      x.upload.onprogress = (e) => { item.done = e.loaded; drawQueue(); };
+      x.onload = () => { item.state = x.status === 200 ? 'ok' : 'err'; drawQueue(); resolve(); };
+      x.onerror = () => { item.state = 'err'; drawQueue(); resolve(); };
+      x.send(item.file);
+    });
+  }
+
+  let drawPending = false;
+  function drawQueue() {
+    if (drawPending) return; drawPending = true;
+    requestAnimationFrame(() => {
+      drawPending = false;
+      const active = queue.filter((q) => q.state === 'run' || q.state === 'wait');
+      if (!active.length) { $('#liveOut').innerHTML = ''; return; }
+      const run = queue.find((q) => q.state === 'run');
+      const doneCount = queue.filter((q) => q.state === 'ok').length;
+      const pct = run && run.file.size ? (run.done / run.file.size) * 100 : 0;
+      $('#liveOut').innerHTML = `<div class="liverow"><span class="n">${run ? esc(run.file.name) : 'Hazırlanıyor…'}</span>
+        <span class="p num">${doneCount + 1}/${queue.length}</span><div class="bar"><i style="width:${pct}%"></i></div></div>`;
+    });
+  }
+
+  poll();
+})();
+</script>
+</body>
+</html>

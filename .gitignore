@@ -1,0 +1,8 @@
+# Derleme çıktıları
+dist/
+*.exe
+!rsrc_windows_amd64.syso
+
+# Yerel test verileri
+iPhone'dan Gelenler/
+iPhone'a Gönderilecekler/
