@@ -1,0 +1,40 @@
+name: Sürüm oluştur
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+
+      - name: Windows için derle
+        run: GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o Kopru.exe .
+
+      - name: ZIP olarak paketle
+        run: |
+          python3 - <<'PY'
+          import zipfile
+          guide = open("docs/Nasıl kullanılır.txt", encoding="utf-8").read().replace("\r\n", "\n").replace("\n", "\r\n")
+          with zipfile.ZipFile("Kopru-Windows.zip", "w", zipfile.ZIP_DEFLATED) as z:
+              z.write("Kopru.exe", "Köprü/Kopru.exe")
+              z.writestr("Köprü/Nasıl kullanılır.txt", "﻿" + guide)
+          PY
+
+      - name: Sürümü yayınla
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Köprü ${{ github.ref_name }}
+          body_path: .github/release-notes.md
+          files: Kopru-Windows.zip
+          make_latest: true

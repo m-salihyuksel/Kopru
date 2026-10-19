@@ -1,0 +1,91 @@
+KÖPRÜ – iPhone ile Windows arasında fotoğraf, video ve dosya aktarımı
+=====================================================================
+
+iPhone'a ayrı bir uygulama kurmanız gerekmez. PC'de Köprü'yü açarsınız,
+iPhone kamerasıyla ekrandaki QR kodu okutursunuz, Safari'de açılan
+sayfadan iki yönlü aktarım yaparsınız. Aktarım kablosuz ve tamamen
+evinizdeki ağ içinde gerçekleşir; dosyalar internete çıkmaz.
+
+
+İLK ÇALIŞTIRMA
+--------------
+1. Kopru.exe'ye çift tıklayın.
+
+2. "Windows bilgisayarınızı korudu" uyarısı çıkarsa:
+   "Ek bilgi" → "Yine de çalıştır" deyin. (Uygulama imzalı olmadığı
+   için Windows bu uyarıyı gösterir.)
+
+3. Güvenlik duvarı "erişime izin verilsin mi?" diye sorarsa
+   "Özel ağlar" kutusu işaretliyken "Erişime izin ver" deyin.
+   Bu izin olmadan iPhone bilgisayara ulaşamaz.
+
+4. Tarayıcıda Köprü paneli açılır. Siyah konsol penceresi uygulamanın
+   kendisidir; açık kaldığı sürece Köprü çalışır. Kapatınca durur.
+
+
+iPHONE'U BAĞLAMA
+----------------
+- iPhone ile bilgisayar aynı Wi-Fi ağında olmalı.
+  (Ya da bilgisayarı iPhone'un Kişisel Erişim Noktası'na bağlayın;
+  modem olmadan da çalışır.)
+- iPhone'da Kamera'yı açıp paneldeki QR koda tutun, çıkan bağlantıya
+  dokunun. Safari'de Köprü sayfası açılır.
+- İpucu: Safari'de paylaş simgesi → "Ana Ekrana Ekle" derseniz Köprü
+  iPhone'da uygulama gibi bir simgeyle durur; bir dahaki sefere QR
+  okutmadan açabilirsiniz (bilgisayarın IP adresi değişmediyse).
+
+
+iPHONE → PC
+-----------
+- iPhone'daki sayfada "PC'ye gönder" → "Fotoğraf, video ya da dosya seç".
+- Fotoğraf Arşivi'nden istediğiniz kadar seçin. Gönderim hemen başlar.
+- Gelenler şu klasöre kaydedilir:
+      C:\Kullanıcılar\<adınız>\Köprü\iPhone'dan Gelenler
+- Aktarım bitene kadar iPhone ekranını açık tutun; telefon kilitlenirse
+  Safari aktarımı durdurur. Yarım kalanları "Tekrar dene" ile
+  yeniden gönderebilirsiniz.
+- Not: iPhone, Safari üzerinden gönderilen HEIC fotoğrafları çoğu zaman
+  otomatik olarak JPG'ye çevirir. Bu normaldir; JPG her yerde açılır.
+
+
+PC → iPHONE
+-----------
+- Dosyaları paneldeki "iPhone'a gönderilecekler" alanına sürükleyin
+  (ya da "Dosya ekle"ye basın, ya da dosyaları doğrudan
+  Köprü\iPhone'a Gönderilecekler klasörüne kopyalayın).
+- iPhone'da "PC'den al" sekmesine geçin, dosyaya dokunun:
+    • Fotoğraf: görsele basılı tutup "Fotoğraflar'a Ekle".
+    • Video: "İndir" → Dosyalar uygulaması → İndirilenler →
+      videoyu açıp paylaş → "Videoyu Kaydet".
+    • Diğer dosyalar: "İndir" → Dosyalar uygulamasına kaydedilir.
+- Çok dosya varsa "Tümünü indir (ZIP)". ZIP, Dosyalar uygulamasında
+  dokununca açılır.
+
+
+SORUN ÇÖZME
+-----------
+* iPhone sayfayı açamıyor ("Sunucuya bağlanılamıyor"):
+  - İkisi de aynı Wi-Fi'da mı? Misafir ağları cihazları birbirinden
+    ayırabilir; ana ağı kullanın.
+  - Güvenlik duvarı izni verilmemiş olabilir. Windows Ayarları →
+    Gizlilik ve güvenlik → Windows Güvenliği → Güvenlik duvarı ve ağ
+    koruması → "Bir uygulamaya güvenlik duvarı üzerinden izin ver" →
+    Köprü'yü bulup "Özel" kutusunu işaretleyin.
+  - Ağınız "Ortak" olarak ayarlıysa: Ayarlar → Ağ ve İnternet → Wi-Fi →
+    bağlı ağ → Ağ profili türü: "Özel".
+  - Bilgisayarda VPN, sanal makine veya birden çok ağ bağlantısı varsa
+    paneldeki "Kullanılan ağ bağlantısı" listesinden Wi-Fi'ı seçin.
+
+* "Kodu yeniden okutun" sayfası çıkıyor:
+  Paneldeki QR kodu tekrar okutun. Erişim anahtarı bu bilgisayara özel
+  ve kalıcıdır; başkası aynı ağda olsa bile anahtar olmadan giremez.
+
+* Aktarım yavaş: Bilgisayara ya da iPhone'a yakın durun; 5 GHz Wi-Fi
+  çok daha hızlıdır.
+
+
+GELİŞMİŞ
+--------
+Kopru.exe -dir "D:\Aktarımlar"   Farklı bir ana klasör kullanır.
+Kopru.exe -port 9000             Farklı port kullanır.
+Ayarlar: %AppData%\Kopru\config.json
